@@ -1,0 +1,1094 @@
+{
+  "name": "FINISHED",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                2,
+                3,
+                4
+              ],
+              "triggerAtHour": 20,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "7975aaba-2803-4795-a43a-0ce1b76fca1a",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1240,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Initialize workflow static data for tracking progress\nconst data = $getWorkflowStaticData('global');\nif (!data.lastRow) {\n  data.lastRow = 2; // Start at row 2 (skip header)\n  data.totalProcessed = 0;\n}\nreturn [{ json: { lastRow: data.lastRow, totalProcessed: data.totalProcessed } }];"
+      },
+      "id": "0a83ecba-8c76-48ce-9663-b9dc309ca51b",
+      "name": "Initialize Progress",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1vAkMt5yDwgjPHviM6pm7scTR5Fvol03n6YV8dx5MkgE",
+          "mode": "list",
+          "cachedResultName": "final_500_internship_companies.csv",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vAkMt5yDwgjPHviM6pm7scTR5Fvol03n6YV8dx5MkgE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 708354576,
+          "mode": "list",
+          "cachedResultName": "final_500_internship_companies.csv.csv",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1vAkMt5yDwgjPHviM6pm7scTR5Fvol03n6YV8dx5MkgE/edit#gid=708354576"
+        },
+        "options": {}
+      },
+      "id": "02161f2d-6799-4185-86ae-96b74e484db1",
+      "name": "Get All Data",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -840,
+        -160
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u6DaZNOpz7CuJQZo",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $getWorkflowStaticData('global');\nif (data.lastRow == null) {\n  data.lastRow = 2;\n  data.totalProcessed = 0;\n}\n\nconst allRows = $input.all();\nconst totalRows = allRows.length;\nconst batchSizeMax = 20;\n\nif (data.lastRow > totalRows) {\n  return [{\n    json: {\n      completed: true,\n      totalProcessed: data.totalProcessed\n    }\n  }];\n}\n\nconst startIndex = data.lastRow - 2;\nconst endRow = Math.min(data.lastRow + batchSizeMax - 1, totalRows);\nconst batchData = allRows.slice(startIndex, endRow);\n\nconst result = batchData.map((item, i) => {\n  const row = item.json;\n\n  return {\n    json: {\n      companyName: row[\"Company Name\"] || row[\"0\"] || '',\n      companyType: row[\"Company Type\"] || row[\"1\"] || '',\n      role: row[\"Role\"] || row[\"2\"] || '',\n      website: row[\"Website\"] || row[\"3\"] || '',\n      companyEmail: row[\"Company Email\"] || row[\"4\"] || '',\n      hrEmail: row[\"HR Email\"] || row[\"5\"] || '',\n      location: row[\"Location\"] || row[\"6\"] || '',\n      techStack: row[\"Tech Stack\"] || row[\"7\"] || '',\n      rowNumber: row[\"row_number\"] || data.lastRow + i,\n\n      batchIndex: i + 1,\n      batchSize: batchData.length,\n      currentRowNumber: data.lastRow + i,\n      endRow,\n      totalRows,\n      completed: false\n    }\n  };\n});\n\nreturn result;\n"
+      },
+      "id": "b861c75e-bea2-4491-90cf-d2cbbae64948",
+      "name": "Get Current Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -620,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "completion_check",
+              "leftValue": "={{ $json.completed }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              },
+              "rightValue": true
+            },
+            {
+              "id": "b001290f-cfcd-45a9-9f86-cfe0c5324827",
+              "leftValue": "={{ $json.completed }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "b26820f2-5822-4184-89ef-602b762e628b",
+      "name": "Check If Completed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -440,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log final completion to Dashboard\nconst now = new Date();\n\n// Try to read totalProcessed from the triggering JSON,\n// otherwise fall back to the global staticData\nconst completionData = $json;\nconst staticData    = $getWorkflowStaticData('global');\nconst totalCount    = completionData.totalProcessed ?? staticData.totalProcessed ?? 0;\n\nconst logItem = {\n  Date:           now.toLocaleDateString('en-GB').replace(/\\//g, '-'),\n  Time:           now.toLocaleTimeString('en-GB', { hour12: false }),\n  'Company Name': 'WORKFLOW COMPLETED',\n  Role:           'N/A',\n  'Company Email':'N/A',\n  'HR Email':     'N/A',\n  'Tech Stack':   'N/A',\n  Status:         'COMPLETED',\n  'Email Content': `All companies processed! Total: ${totalCount}`,\n  'Batch Info':   'Final',\n  'Row Number':   'N/A',\n  Error:          ''\n};\n\nconsole.log('📊 Final completion log:', logItem);\nreturn [{ json: logItem }];"
+      },
+      "id": "47313098-72a3-4a4b-b247-a7bde16b2197",
+      "name": "Log Completion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -460,
+        140
+      ],
+      "alwaysOutputData": true,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM",
+          "mode": "list",
+          "cachedResultName": "Dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.Date }}",
+            "Time": "={{ $json.Time }}",
+            "company name": "={{ $json['Company Name'] }}",
+            "Role": "={{ $json.Role }}",
+            "Emails Sent To": "={{ $json['Company Email'] }}",
+            "Status": "={{ $json.Status }}",
+            "Template (full content)": "={{ $json['Email Content'] }}",
+            "Error (if any)": "={{ $json.Error }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "company name",
+              "displayName": "company name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Role",
+              "displayName": "Role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Emails Sent To",
+              "displayName": "Emails Sent To",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Template (full content)",
+              "displayName": "Template (full content)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error (if any)",
+              "displayName": "Error (if any)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "61f70ae2-cefb-4191-8b8b-426b2970a219",
+      "name": "Log Completion to Dashboard",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -200,
+        20
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u6DaZNOpz7CuJQZo",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const me = {\n  name:        'Sairohith',\n  degree:      '3rd-year Computer Science student',\n  university:  'SRM University, Chennai',\n  linkedin:    'https://www.linkedin.com/in/sairohith-tappatla-076378312/',\n  github:      'https://github.com/sairohithtappatla',\n  portfolio:   'https://portfolio-sairohith.netlify.app/'\n};\n\n// Pull input\nconst companyName = $json.companyName || 'Unknown Company';\nconst role        = $json.role || 'Intern';\nconst techStack   = $json.techStack || 'modern technologies';\nconst companyEmail = $json.companyEmail || '';\nconst hrEmail      = $json.hrEmail || '';\nconst location     = $json.location || '';\nconst website      =$json.website || '';\nconst  companyType        =$json.companyType\n\nreturn {\n  json: {\n    companyData: {\n      companyName,\n      role,\n      techStack,\n      companyEmail,\n      hrEmail,\n      location,\n      website,\n      companyType\n    },\n    aiRequest: {\n      model: 'mistralai/mistral-7b-instruct',\n      messages: [{\n        role: 'user',\n        content: `\nYou are an expert in cold outreach and email writing.\n\nGiven the following details, generate a professional and friendly cold email message suitable for reaching out to a company for an internship opportunity.\n\nRespond with only the email text — do not explain or add anything extra.\n\nStudent Info:\n• Name: ${me.name}\n• Degree: ${me.degree}\n• University: ${me.university}\n• Portfolio: ${me.portfolio}\n• GitHub: ${me.github}\n• LinkedIn: ${me.linkedin}\n\nCompany Info:\n• Company Name: ${companyName}\n• Role: ${role}\n• Tech Stack: ${techStack}\n• Location: ${location}\n• Company Type: ${companyType}\n• Website: ${website}\n• HR Email: ${hrEmail}\n• Company Email: ${companyEmail}\n\nInstructions:\n-Dont give subject i already have it and also dont make like[your intrests ,etc] u make it clear professional content with short and crisp \n- The email should be concise, polite, and show enthusiasm.\n- Mention the student’s technical background and projects.(dont ask me again u jsut fill)\n- Include contact links (GitHub, LinkedIn, Portfolio).\n- End with a call to action (e.g., open to connect, schedule a call, etc.)\n- Don’t include any headings or markdown — just the raw email text.\n`.trim()\n      }]\n    }\n  }\n}"
+      },
+      "id": "b324617b-8e6d-4bf6-980d-9983b15927dc",
+      "name": "Prepare AI Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -380
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.aiRequest }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "976750fb-e1b9-4738-8a8f-458eed532f0f",
+      "name": "Generate Email with AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        360,
+        -380
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ANPKXtNc20m7nQIe",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Pull out email text + company fields\n// companyData is the object containing all the normalized company details\nconst companyData = $('Prepare AI Request').item.json.companyData;\n\n// $json.choices?.[0]?.message?.content is where the AI-generated email text is\nconst emailText = $json.choices?.[0]?.message?.content || '';\n\n// Debug log to confirm companyData contents - CHECK THIS IN THE NODE'S \"LOG\" TAB!\nconsole.log(\"DEBUG: companyData in Extract Email Data:\", JSON.stringify(companyData, null, 2));\n\nreturn {\n  json: {\n    emailContent: emailText,\n    CompanyEmail: companyData.companyEmail || '',\n    HREmail: companyData.hrEmail || '',\n    CompanyName: companyData.companyName || '',\n    Role: companyData.role || '',\n    TechStack: companyData.techStack || '',\n    Website: companyData.website || '',\n    CompanyType: companyData.companyType || '',\n    Location: companyData.location || '',\n    batchIndex: companyData.batchIndex,\n    batchSize: companyData.batchSize,\n    currentRowNumber: companyData.currentRowNumber,\n    endRow: companyData.endRow,\n    totalRows: companyData.totalRows\n  }\n};"
+      },
+      "id": "4a0863d4-19c7-49fe-b477-866037f5b329",
+      "name": "Extract Email Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        -380
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.CompanyEmail }},{{ $json.HREmail }}",
+        "subject": "=Internship Application: {{$json.Role}} Position at {{$json.CompanyName}}",
+        "emailType": "text",
+        "message": "={{ $json.emailContent }}",
+        "options": {
+          "ccList": "={{ $json.HREmail && $json.HREmail !== $json.CompanyEmail ? $json.HREmail : '' }}"
+        }
+      },
+      "id": "79c452b7-5fcd-44c3-9482-a46c3fac4207",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        740,
+        -380
+      ],
+      "webhookId": "2718eb05-8b45-4cdd-8199-d0e8a9ffc0bd",
+      "alwaysOutputData": true,
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "jxqDviS7R4xatfmw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tag sent email with timestamp\nconst now = new Date();\nreturn [{\n  ...$json,\n  status: 'Sent Successfully',\n  currentDate: now.toLocaleDateString('en-GB').replace(/\\//g,'-'),\n  currentTime: now.toLocaleTimeString('en-GB',{hour12:false}),\n  timestamp: now.toISOString()\n}];\n"
+      },
+      "id": "4562c9ba-9275-4225-ab17-eb6fb9f1be13",
+      "name": "Add Timestamp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        -380
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM",
+          "mode": "list",
+          "cachedResultName": "Dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.currentDate }}",
+            "Time": "={{ $json.currentTime }}",
+            "Status": "={{ $json.status }}",
+            "Template (full content)": "={{ $json.emailContent }}",
+            "Company Name": "={{ $json.CompanyName }}",
+            "Emails Sent To": "={{ $json.CompanyEmail }},{{ $json.HREmail }}",
+            "Role": "={{ $json.Role }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Role",
+              "displayName": "Role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Emails Sent To",
+              "displayName": "Emails Sent To",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Template (full content)",
+              "displayName": "Template (full content)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error (if any)",
+              "displayName": "Error (if any)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "7329c71b-462e-4958-90c9-4b9a7c7a7fac",
+      "name": "Log to Dashboard",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1360,
+        -380
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u6DaZNOpz7CuJQZo",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "await new Promise(r => setTimeout(r,5000));\nreturn [ $json ];"
+      },
+      "id": "52d6d58d-b4c6-48a4-b8b8-db1597ae7db4",
+      "name": "Rate Limiting Delay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "batch_end_check",
+              "leftValue": "={{ $json.batchIndex }}",
+              "operator": {
+                "type": "number",
+                "operation": "equal"
+              },
+              "rightValue": "={{ $json.batchSize }}"
+            },
+            {
+              "id": "5c8999ab-26af-4e8d-b2d0-c8630c8897d7",
+              "leftValue": "={{ parseInt($json.batchIndex, 10) }}",
+              "rightValue": "={{ parseInt($json.batchSize, 10) }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "1ab76544-9bd5-4de5-8fca-b2507ec34555",
+      "name": "Check If Batch End",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -360
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $getWorkflowStaticData('global');\nconst item = $json;\ndata.lastRow = item.endRow + 1;\ndata.totalProcessed = (data.totalProcessed || 0) + item.batchSize;\nreturn [{ json: { nextStartRow: data.lastRow, totalProcessed: data.totalProcessed, completed: data.lastRow>item.totalRows } }];"
+      },
+      "id": "67d046ee-e3b3-4145-80a4-e8b8b7949c59",
+      "name": "Update Progress After Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2040,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Pull the incoming Error instance and grab its message\nconst incomingError = $json.error || $json; \nconst errorMsg      = incomingError?.message || incomingError?.toString() || 'Unknown error';\n\n// 2) Safely retrieve the companyData from the AI step (if it ran)\nlet companyData = {};\ntry {\n  const aiNode = $('Prepare AI Request');\n  companyData = aiNode?.context?.companyData || {};\n} catch (error) {\n  // If 'Prepare AI Request' node doesn't exist, leave companyData as empty object\n}\n\n// 3) Make a brand-new JSON object for logging\nconst now = new Date();\nreturn [\n  {\n    json: {\n      Date:          now.toLocaleDateString('en-GB').replace(/\\//g,'-'),\n      Time:          now.toLocaleTimeString('en-GB',{hour12:false}),\n      companyName:   companyData.companyName    || companyData['Company Name'] || 'Unknown',\n      role:          companyData.role           || 'N/A',\n      companyEmail:  companyData.companyEmail   || '',\n      hrEmail:       companyData.hrEmail        || '',\n      techStack:     companyData.techStack      || '',\n      status:        'Error',\n      errorMessage:  errorMsg,\n      batchInfo:     `${companyData.batchIndex||'?'} / ${companyData.batchSize||'?'}`\n    }\n  }\n];"
+      },
+      "id": "0e246bb3-fda4-4b6c-a186-df6ff4963775",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1060,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM",
+          "mode": "list",
+          "cachedResultName": "Dashboard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/11cJh58EFGLTB2e_vDIMh4qWae-0_4GIjvbr30NF_xWM/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.Date }}",
+            "Time": "={{ $json.Time }}",
+            "Role": "={{ $json.role }}",
+            "Emails Sent To": "={{ $json.companyEmail }},{{ $json.hrEmail }}",
+            "Status": "={{ $json.status }}",
+            "Template (full content)": "={{ $json.errorMessage }}",
+            "Company Name": "={{ $json.companyName }}",
+            "Error (if any)": "={{ $json.errorMessage }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Time",
+              "displayName": "Time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Company Name",
+              "displayName": "Company Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Role",
+              "displayName": "Role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Emails Sent To",
+              "displayName": "Emails Sent To",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Template (full content)",
+              "displayName": "Template (full content)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Error (if any)",
+              "displayName": "Error (if any)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c132ddef-2720-4cb3-b6eb-a35f39ae39eb",
+      "name": "Log Error to Dashboard",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1500,
+        -60
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "u6DaZNOpz7CuJQZo",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "company_name_check",
+              "leftValue": "={{ $json['Company Name'] || $json['company name'] || $json.name }}",
+              "operator": {
+                "type": "string",
+                "operation": "isEmpty"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "9b6952a8-5be7-4808-a471-76d1bfb72fb0",
+              "leftValue": "={{ $json.companyName }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "0107d35e-cf80-4eef-9314-f78d198d3a5f",
+      "name": "Check Company Name",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -100,
+        -280
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        -60
+      ],
+      "id": "82a4ba6a-11c8-4f5a-9a7f-f8a898dbb7bb",
+      "name": "Wait",
+      "webhookId": "d616e3b3-1e20-45ee-b17a-93873db8562e"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2586f61c-9500-49a6-8cfe-c8eb50555536",
+              "name": "CompanyName",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.CompanyName }}",
+              "type": "string"
+            },
+            {
+              "id": "3a10d94b-7a03-4ce2-8030-ce6db1643c9e",
+              "name": "TechStack",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.TechStack }}",
+              "type": "string"
+            },
+            {
+              "id": "86790aa9-3910-47b2-8a05-79e2eba38b89",
+              "name": "Role",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.Role}}",
+              "type": "string"
+            },
+            {
+              "id": "1a362a06-a1f6-4841-b019-be4b079e7447",
+              "name": "CompanyType",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.CompanyType}}",
+              "type": "string"
+            },
+            {
+              "id": "d0a9f434-90c8-4433-ad17-cab061c019d9",
+              "name": "Location",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.Location}}",
+              "type": "string"
+            },
+            {
+              "id": "6a316485-a9ec-42e8-b691-43436d1b91e3",
+              "name": "Website",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.Website}}",
+              "type": "string"
+            },
+            {
+              "id": "8068ea98-941b-4540-bdbc-270d3c386a8c",
+              "name": "CompanyEmail",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.CompanyEmail}}",
+              "type": "string"
+            },
+            {
+              "id": "9a05f069-9e75-48e4-8f84-0b44890a63e2",
+              "name": "HREmail",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.HREmail}}",
+              "type": "string"
+            },
+            {
+              "id": "f96edfbd-ce1c-47c2-afd8-fd41ed92cd10",
+              "name": "emailContent",
+              "value": "={{ $('Extract Email Data').all()[$itemIndex].json.emailContent}}",
+              "type": "string"
+            },
+            {
+              "id": "dc376f28-e115-41ff-890c-381def35a0bf",
+              "name": "labelIds[0]",
+              "value": "={{ $json.labelIds[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1200,
+        -380
+      ],
+      "id": "7cec2290-2b61-4221-858d-1adf2206c1e9",
+      "name": "Edit Fields"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Initialize Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initialize Progress": {
+      "main": [
+        [
+          {
+            "node": "Get All Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Data": {
+      "main": [
+        [
+          {
+            "node": "Get Current Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Current Batch": {
+      "main": [
+        [
+          {
+            "node": "Check If Completed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Completed": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Company Name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Completion": {
+      "main": [
+        [
+          {
+            "node": "Log Completion to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Request": {
+      "main": [
+        [
+          {
+            "node": "Generate Email with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email with AI": {
+      "main": [
+        [
+          {
+            "node": "Extract Email Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Email Data": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Add Timestamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Timestamp": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Rate Limiting Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limiting Delay": {
+      "main": [
+        [
+          {
+            "node": "Check If Batch End",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Batch End": {
+      "main": [
+        [
+          {
+            "node": "Update Progress After Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Update Progress After Batch": {
+      "main": [
+        [
+          {
+            "node": "Get Current Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error to Dashboard": {
+      "main": [
+        [
+          {
+            "node": "Rate Limiting Delay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Company Name": {
+      "main": [
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare AI Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Log Error to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Log to Dashboard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "89bbbedc-8e4e-4f1b-b947-e26c65cbe6df",
+  "meta": {
+    "instanceId": "322374a3dd68495b1b11cfef8c88292e144985503b4921bb579f910b62871661"
+  },
+  "id": "t0GF3CIsgLSirUNJ",
+  "tags": []
+}
